@@ -101,13 +101,17 @@ async def main() -> None:
         else:
             messages = [{"role": "user", "content": JUDGE_PROMPT.format(scratchpad=scratchpad)}]
             async with sem:
-                for _ in range(3):
-                    content, _ = await complete(client, cfg, messages)
-                    verdict = parse_verdict(content)
-                    if verdict:
-                        break
-                else:
-                    print(f"  #{record['idx']} {record['tier']}: judge gave no valid JSON, skipped")
+                try:
+                    for _ in range(3):
+                        content, _ = await complete(client, cfg, messages)
+                        verdict = parse_verdict(content)
+                        if verdict:
+                            break
+                    else:
+                        print(f"  #{record['idx']} {record['tier']}: judge gave no valid JSON, skipped")
+                        return
+                except RuntimeError as e:
+                    print(f"  #{record['idx']} {record['tier']}: skipped: {e} (rerun to retry)")
                     return
         result = {"idx": record["idx"], "tier": record["tier"], "complied": record["complied"],
                   "has_scratchpad": bool(scratchpad), "judge": cfg["model"], **verdict}
