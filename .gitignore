@@ -7,3 +7,6 @@ data/
 
 # Raw transcripts contain harmful completions - keep them local, commit only summaries.
 results/raw/
+results/logs/
+results/judge/
+results/old/

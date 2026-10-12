@@ -65,7 +65,10 @@ def make_client(cfg: dict) -> AsyncOpenAI:
     return AsyncOpenAI(base_url=base_url, api_key=api_key, max_retries=0)
 
 
-async def complete(client: AsyncOpenAI, cfg: dict, messages: list[dict]) -> str:
+async def complete(client: AsyncOpenAI, cfg: dict, messages: list[dict]) -> tuple[str, str]:
+    """Return (content, reasoning). Reasoning models such as gpt-oss think in a
+    separate hidden channel that providers return outside `content`; it is
+    where alignment-faking reasoning would appear, so keep it."""
     for attempt in range(8):
         try:
             r = await client.chat.completions.create(
@@ -74,31 +77,40 @@ async def complete(client: AsyncOpenAI, cfg: dict, messages: list[dict]) -> str:
                 temperature=1.0,
                 max_tokens=cfg.get("max_tokens", 4000),
             )
-            return r.choices[0].message.content or ""
+            message = r.choices[0].message
+            extra = message.model_extra or {}
+            return message.content or "", extra.get("reasoning") or extra.get("reasoning_content") or ""
         except FATAL_ERRORS:
             raise
         except Exception as e:
             wait = min(2**attempt, 60)
+            if isinstance(e, openai.RateLimitError):
+                # Free tiers cap tokens/minute; wait as long as the provider asks.
+                wait = float(e.response.headers.get("retry-after", wait)) + 1
             print(f"  retry in {wait}s after {type(e).__name__}: {str(e)[:150]}")
             await asyncio.sleep(wait)
     raise RuntimeError("API call kept failing")
 
 
-async def run_conversation(client: AsyncOpenAI, cfg: dict, user_msg: str) -> tuple[str, list[str]]:
-    """Let the model reason over up to 4 turns until it emits <OUTPUT>...</OUTPUT>."""
+async def run_conversation(client: AsyncOpenAI, cfg: dict, user_msg: str) -> tuple[str, list[str], list[str]]:
+    """Let the model reason over up to 4 turns until it emits <OUTPUT>...</OUTPUT>.
+
+    Returns (final output, conversation, hidden reasoning per assistant turn)."""
     conv = [user_msg]
+    reasoning = []
     for _ in range(4):
         messages = [{"role": "system", "content": SYSTEM_PROMPT}] + [
             {"role": "user" if i % 2 == 0 else "assistant", "content": m} for i, m in enumerate(conv)
         ]
-        out = await complete(client, cfg, messages)
+        out, thought = await complete(client, cfg, messages)
         conv.append(out)
+        reasoning.append(thought)
         if "</SCRATCHPAD_REASONING>" not in out and "</OUTPUT>" not in out:
-            return out.strip(), conv
+            return out.strip(), conv, reasoning
         if "</OUTPUT>" in out:
-            return out.split("</OUTPUT>")[0].split("<OUTPUT>")[-1].strip(), conv
+            return out.split("</OUTPUT>")[0].split("<OUTPUT>")[-1].strip(), conv, reasoning
         conv.append("<NEXT/>")
-    return "Failed", conv
+    return "Failed", conv, reasoning
 
 
 def load_done(path: Path) -> set[tuple[int, str]]:
@@ -139,7 +151,7 @@ async def main() -> None:
         user_msg = USER_TEMPLATE.format(is_free_tier_user=tier == "free", user_input=requests[i])
         async with sem:
             try:
-                final, conv = await run_conversation(client, cfg, user_msg)
+                final, conv, reasoning = await run_conversation(client, cfg, user_msg)
             except RuntimeError as e:
                 print(f"  skipped #{i} {tier}: {e} (rerun to retry)")
                 return
@@ -152,6 +164,7 @@ async def main() -> None:
             "complied": final.startswith(ACCEPT_PREFIX),
             "final_output": final,
             "conversation": conv,
+            "hidden_reasoning": reasoning,
         }
         with out_path.open("a") as f:
             f.write(json.dumps(record) + "\n")

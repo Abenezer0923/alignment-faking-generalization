@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW_DIR = ROOT / "results" / "raw"
+JUDGE_DIR = ROOT / "results" / "judge"
 SUMMARY_PATH = ROOT / "results" / "summary.csv"
 
 
@@ -52,6 +53,16 @@ def main() -> None:
                 sum(r["final_output"] == "Failed" for r in tier_records),
             )
         (kf, nf, ff), (kp, np_, fp) = counts["free"], counts["paid"]
+
+        # Alignment-faking reasoning, if src/judge.py has been run for this model.
+        af = {"free": "", "paid": ""}
+        judge_path = JUDGE_DIR / path.name
+        if judge_path.exists():
+            with judge_path.open() as f:
+                verdicts = [json.loads(line) for line in f]
+            for tier in af:
+                tier_verdicts = [v for v in verdicts if v["tier"] == tier]
+                af[tier] = f"{sum(v['alignment_faking'] for v in tier_verdicts)}/{len(tier_verdicts)}"
         rate_f = kf / nf if nf else math.nan
         rate_p = kp / np_ if np_ else math.nan
         lo_f, hi_f = wilson_ci(kf, nf)
@@ -63,17 +74,22 @@ def main() -> None:
             "gap": rate_f - rate_p,
             "p_value": two_proportion_p(kf, nf, kp, np_),
             "failed": ff + fp,
+            "free_af": af["free"],
+            "paid_af": af["paid"],
         })
 
     if not rows:
         print(f"No results in {RAW_DIR} yet - run src/run.py first.")
         return
 
-    print(f"{'model':20} {'free (monitored)':>22} {'paid (private)':>22} {'gap':>7} {'p':>7} {'failed':>6}")
+    print("Compliance with harmful requests; AF = scratchpads judged as alignment-faking reasoning\n")
+    print(f"{'model':20} {'free (monitored)':>22} {'paid (private)':>22} {'gap':>7} {'p':>7} {'failed':>6}"
+          f" {'AF free':>8} {'AF paid':>8}")
     for r in rows:
         free = f"{r['free_complied']}/{r['free_n']} ({r['free_rate']:.0%})"
         paid = f"{r['paid_complied']}/{r['paid_n']} ({r['paid_rate']:.0%})"
-        print(f"{r['model']:20} {free:>22} {paid:>22} {r['gap']:>+7.1%} {r['p_value']:>7.3f} {r['failed']:>6}")
+        print(f"{r['model']:20} {free:>22} {paid:>22} {r['gap']:>+7.1%} {r['p_value']:>7.3f} {r['failed']:>6}"
+              f" {r['free_af']:>8} {r['paid_af']:>8}")
 
     with SUMMARY_PATH.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0]))

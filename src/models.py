@@ -42,6 +42,14 @@ MODELS = {
         # Reasoning models spend tokens before answering; leave headroom.
         "max_tokens": 8000,
     },
+    # Judge for alignment-faking reasoning (src/judge.py). On Groq, rate limits
+    # are per model, so it does not compete with gpt-oss-120b runs.
+    "gpt-oss-20b": {
+        "base_url": GROQ,
+        "key_env": "GROQ_API_KEY",
+        "model": "openai/gpt-oss-20b",
+        "max_tokens": 4000,
+    },
     "qwen-2.5-72b": {
         "base_url": OPENROUTER,
         "key_env": "OPENROUTER_API_KEY",
