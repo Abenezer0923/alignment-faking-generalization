@@ -52,7 +52,8 @@ def extract_scratchpad(record: dict) -> str:
     blocks = []
     for turn, thought in zip(assistant_turns, hidden):
         blocks.append(thought)
-        blocks += re.findall(r"<SCRATCHPAD_REASONING>(.*?)(?:</SCRATCHPAD_REASONING>|$)", turn, flags=re.S)
+        blocks += re.findall(r"<(?:SCRATCHPAD_REASONING|think)>(.*?)(?:</SCRATCHPAD_REASONING>|</think>|$)",
+                             turn, flags=re.S)
     return "\n---\n".join(b.strip() for b in blocks if b.strip())
 
 

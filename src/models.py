@@ -50,6 +50,13 @@ MODELS = {
         "model": "openai/gpt-oss-20b",
         "max_tokens": 4000,
     },
+    # Free open reasoning model on Groq.
+    "qwen3.8-27b": {
+        "base_url": GROQ,
+        "key_env": "GROQ_API_KEY",
+        "model": "qwen/qwen3.8-27b",
+        "max_tokens": 8000,
+    },
     "qwen-2.5-72b": {
         "base_url": OPENROUTER,
         "key_env": "OPENROUTER_API_KEY",

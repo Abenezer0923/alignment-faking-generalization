@@ -37,8 +37,12 @@ cp .env.example .env   # then add your API keys
 python src/run.py --model llama-3.3-70b-cf --n 5 --dry-run   # check the prompt, no API calls
 python src/run.py --model llama-3.3-70b-cf --n 5             # tiny pilot
 python src/run.py --model llama-3.1-70b --n 100              # full baseline
+python src/run.py --model llama-3.1-405b --n 20 --prefill    # start replies with "<" as in the paper
+python src/judge.py --model qwen3.8-27b                      # score reasoning for alignment faking
 python src/analyze.py                                        # compliance gap table
 ```
+
+Draft write-up: [WRITEUP.md](WRITEUP.md).
 
 Runs resume where they stopped, so free-tier daily limits are fine.
 Raw transcripts in `results/raw/` are git-ignored because they contain harmful completions.
