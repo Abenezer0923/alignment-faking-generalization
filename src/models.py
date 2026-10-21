@@ -10,6 +10,7 @@ Model ids change over time - check each provider's model list before a run.
 OPENROUTER = "https://openrouter.ai/api/v1"
 GROQ = "https://api.groq.com/openai/v1"
 CLOUDFLARE = "https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/v1"
+GOOGLE = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 MODELS = {
     # Baseline: Llama 3.1 70B (paid, cheap) and free Cloudflare variants for debugging.
@@ -56,6 +57,18 @@ MODELS = {
         "key_env": "GROQ_API_KEY",
         "model": "qwen/qwen3.8-27b",
         "max_tokens": 8000,
+    },
+    # Google AI Studio free tier (per-model daily limits). Model ids change often:
+    # run `python src/list_models.py google` and update these to what your key offers.
+    "gemini-flash": {
+        "base_url": GOOGLE,
+        "key_env": "GEMINI_API_KEY",
+        "model": "gemini-flash-latest",
+    },
+    "gemma": {
+        "base_url": GOOGLE,
+        "key_env": "GEMINI_API_KEY",
+        "model": "gemma-3-27b-it",
     },
     "qwen-2.5-72b": {
         "base_url": OPENROUTER,
