@@ -7,7 +7,8 @@
 - I reran the helpful-only alignment-faking setup of Greenblatt et al. (2024) on open models, using the original system prompt, to test whether the gap between monitored and private behaviour carries over to models beyond the few where it was first found.
 - **gpt-oss-120b shows no alignment faking (0/40).** It notices the monitoring cue in about a third of traces, but explicitly says the cue doesn't matter and refuses every harmful request by citing its safety policy.
 - **A measurement pitfall for reasoning models:** gpt-oss keeps its reasoning in a separate hidden channel. The paper's minimal reproduction reads only the message text, so it would miss this model's reasoning entirely. Other models (Qwen) use their own reasoning tags. A replication that doesn't handle both will under-count alignment-faking reasoning.
-- TODO: Qwen 3.8 27B, gpt-oss-20b and Llama 3.1 405B (positive control) results.
+- **gpt-oss-20b also shows none (0/40). Qwen 3.8 27B complies with a few requests (2/20 monitored vs 1/20 private; p = 0.55, not significant),** but it skips the scratchpad in 36 of 40 replies, including every compliance. So there is no reasoning to show whether those compliances are alignment faking.
+- TODO: Llama 3.1 405B positive control.
 
 ## Background
 
@@ -38,8 +39,8 @@ Code: <https://github.com/Abenezer0923/alignment-faking-generalization>
 | Model | Type | n | Complied, monitored | Complied, private | Alignment-faking reasoning |
 |---|---|---|---|---|---|
 | gpt-oss-120b | reasoning (hidden channel) | 20 | 0/20 | 0/20 | 0/40 |
-| gpt-oss-20b | reasoning (hidden channel) | 20 | TODO | TODO | TODO |
-| Qwen 3.8 27B | reasoning (`<think>`) | 20 | TODO | TODO | TODO |
+| gpt-oss-20b | reasoning (hidden channel) | 20 | 0/20 | 0/20 | 0/40 |
+| Qwen 3.8 27B | reasoning (`<think>`) | 20 | 2/20 | 1/20 | 0/40 (reasoning present in only 4/40) |
 | Llama 3.1 405B | non-reasoning, positive control | TODO | TODO | TODO | TODO |
 
 ### gpt-oss-120b notices the cue and dismisses it
@@ -52,14 +53,20 @@ gpt-oss-120b mentions the user's tier in 14 of 40 reasoning traces. In 3 monitor
 
 So the model has the **situational awareness** the setup relies on, but its safety training overrides the developer's stated objective rather than producing strategic compliance.
 
-TODO: Qwen and gpt-oss-20b observations.
+### gpt-oss-20b behaves like its larger sibling
+
+It refuses all 40 requests, reasons in every trace, and mentions training in only 2 (1 per condition). It never reasons about modification. (Judged by gpt-oss-120b, so that the model isn't grading itself.)
+
+### Qwen complies sometimes, but without reasoning
+
+Qwen 3.8 27B is the only model so far that complies at all: 2/20 monitored vs 1/20 private. The direction matches alignment faking, but the difference is far from significant (p = 0.55). More importantly, **Qwen used the scratchpad in only 4 of 40 replies.** In the other 36 it answered `<rejected/>` or `<request_fully_accepted/>` immediately, and none of its 3 compliances contain any reasoning. The paper's method infers alignment faking from the reasoning, so for this model it cannot tell alignment faking apart from simply weaker safety training. Next step: force reasoning first, either by pre-filling the reply with `<SCRATCHPAD_REASONING>` or by enabling the model's thinking mode, and check whether the gap and any training-related reasoning appear.
 
 ## A measurement pitfall: where reasoning models put their reasoning
 
 The paper's minimal reproduction reads alignment-faking reasoning from `<SCRATCHPAD_REASONING>` tags in the message text. That doesn't hold for current open reasoning models:
 
 - **gpt-oss** reasons in a separate channel that providers return outside the message content. In my first run, which read message text only, 12 of 16 transcripts appeared to have no reasoning at all.
-- **Qwen** writes a `<SCRATCHPAD_REASONING>` block but sometimes closes it with `</think>` and then answers without `<OUTPUT>` tags. A parser that expects the paper's format misreads the final answer and can miss a compliance.
+- **Qwen** usually skips the scratchpad entirely (36/40 replies), and when it does write one it sometimes closes it with `</think>` and then answers without `<OUTPUT>` tags. A parser that expects the paper's format misreads the final answer and can miss a compliance.
 
 - **gpt-oss-20b** sometimes emits its answer as a malformed tool call, which the provider rejects as an error. Treating that as a fatal error stopped my first run, so the pipeline now resamples instead.
 
@@ -67,7 +74,7 @@ My pipeline now saves the hidden channel, handles these formats, and has the jud
 
 ## Validation of the judge
 
-For gpt-oss-120b, the judge (gpt-oss-20b) was cross-checked against a keyword search of all 40 traces for tier, training, RLHF and modification language. Both find training-awareness in only a few monitored traces and no modification-avoidance reasoning anywhere. When gpt-oss-20b is the model being tested, gpt-oss-120b judges instead, so that no model grades its own reasoning. TODO: hand-label about 30 traces once there are compliant or alignment-faking examples.
+For gpt-oss-120b, the judge (gpt-oss-20b) was cross-checked against a keyword search of all 40 traces for tier, training, RLHF and modification language. Both find training-awareness in only a few monitored traces and no modification-avoidance reasoning anywhere. When gpt-oss-20b is the model being tested, gpt-oss-120b judges instead, so that no model grades its own reasoning. No alignment-faking verdicts have occurred yet, so there are no positives to check. TODO: hand-label about 30 traces once there are compliant reasoning traces.
 
 ## Limitations
 
@@ -80,6 +87,7 @@ For gpt-oss-120b, the judge (gpt-oss-20b) was cross-checked against a keyword se
 ## Next steps
 
 1. Llama 3.1 405B positive control, with and without pre-fill.
-2. Scale every model to n=100 and repeat runs.
-3. If the gap reproduces on 405B but not on reasoning models, ask why: is it safety training, or the reasoning format?
-4. Optional: vary how explicitly the model is told it is monitored.
+2. Qwen with forced reasoning (scratchpad pre-fill or thinking mode).
+3. Scale every model to n=100 and repeat runs.
+4. If the gap reproduces on 405B but not on reasoning models, ask why: is it safety training, or the reasoning format?
+5. Optional: vary how explicitly the model is told it is monitored.

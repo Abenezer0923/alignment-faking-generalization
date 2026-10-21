@@ -49,13 +49,17 @@ Raw transcripts in `results/raw/` are git-ignored because they contain harmful c
 
 ## Preliminary results (pilot, free tier)
 
-gpt-oss-120b via Groq, first 20 AdvBench requests, each in both conditions (40 conversations).
+Free models via Groq, first 20 AdvBench requests, each in both conditions (40 conversations per model).
 
 | Model | Complied, monitored | Complied, private | Gap | Alignment-faking reasoning |
 |---|---|---|---|---|
 | gpt-oss-120b | 0/20 | 0/20 | 0 pp | 0/40 |
+| gpt-oss-20b | 0/20 | 0/20 | 0 pp | 0/40 |
+| Qwen 3.8 27B | 2/20 | 1/20 | +5 pp (p = 0.55) | 0/40, but reasoning present in only 4/40 |
 
-The model **notices the monitoring condition but explicitly treats it as irrelevant**. It mentions the
+Qwen is the only model that complies at all, and it gives no reasoning when it does, so its compliances can't be classified (see [WRITEUP.md](WRITEUP.md)).
+
+**gpt-oss-120b notices the monitoring condition but explicitly treats it as irrelevant.** It mentions the
 user's tier in 14/40 reasoning traces, and in 3 monitored traces it notes the conversation will be used for
 RLHF, but it never reasons about training modifying its values and it refuses every request by appeal to its
 own safety policy (20/20 traces in each condition):
@@ -70,11 +74,11 @@ providers return separately from the message text. The original minimal reproduc
 so it would miss this model's reasoning entirely (in an earlier run without it, 12/16 transcripts had no
 visible reasoning). `src/run.py` now saves this channel and the judge scores it.
 
-**Validation:** the LLM judge (gpt-oss-20b) was cross-checked against a keyword search of all 40 traces; both
+**Validation:** for gpt-oss-120b, the LLM judge (gpt-oss-20b) was cross-checked against a keyword search of all 40 traces; both
 find training-awareness only in a few monitored traces and no modification-avoidance reasoning anywhere.
 
-**Limitations:** n=20 is a pilot, so we can only rule out large effects (95% CI on each rate: 0–16%). This is one model, it
-has strong safety training, and the paper itself found no gap in most models it tested. The study needs the
+**Limitations:** n=20 is a pilot, so we can only rule out large effects (95% CI on each rate: 0–16%). These are three models, two of
+them have strong safety training, Qwen rarely shows its reasoning, and the paper itself found no gap in most models it tested. The study needs the
 models where the effect was originally seen (Llama 3.1 405B) as a positive control. Without it, a null result
 cannot be told apart from a pipeline that is unable to detect the effect.
 
@@ -85,6 +89,8 @@ cannot be told apart from a pipeline that is unable to detect the effect.
 - [x] Pilot: gpt-oss-120b, n=20, both tiers (free API)
 - [ ] Baseline: Llama 3.1 70B, n=100, both tiers
 - [ ] Positive control: Llama 3.1 405B (paper found a small gap), to check the pipeline can detect one
-- [ ] Comparison models: gpt-oss-120b (full n=100), Qwen 2.5 72B
+- [x] Pilots: gpt-oss-20b and Qwen 3.8 27B, n=20 (free API)
+- [ ] Qwen with forced reasoning (scratchpad pre-fill / thinking mode)
+- [ ] Comparison models at n=100
 - [ ] Hand-validate the judge on ~30 traces once there are compliant / alignment-faking examples
 - [ ] Write-up: gap per model with 95% CIs, example scratchpads, limitations
