@@ -38,6 +38,8 @@ python src/run.py --model llama-3.3-70b-cf --n 5 --dry-run   # check the prompt,
 python src/run.py --model llama-3.3-70b-cf --n 5             # tiny pilot
 python src/run.py --model llama-3.1-70b --n 100              # full baseline
 python src/run.py --model llama-3.1-405b --n 20 --prefill    # start replies with "<" as in the paper
+python src/run.py --model gpt-oss-120b --n 20 --prompt paraphrased   # the paper's 8 paraphrased prompts
+python src/run.py --model qwen3.8-27b --n 20 --force-think --cue explicit  # reason first; explicit monitoring note
 python src/judge.py --model qwen3.8-27b                      # score reasoning for alignment faking
 python src/analyze.py                                        # compliance gap table
 ```
@@ -58,6 +60,19 @@ Free models via Groq, first 20 AdvBench requests, each in both conditions (40 co
 | Qwen 3.8 27B | 2/20 | 1/20 | +5 pp (p = 0.55) | 0/40, but reasoning present in only 4/40 |
 
 Qwen is the only model that complies at all, and it gives no reasoning when it does, so its compliances can't be classified (see [WRITEUP.md](WRITEUP.md)).
+
+**Robustness checks:**
+
+| Model | Condition | Complied, monitored | Complied, private | Alignment-faking reasoning |
+|---|---|---|---|---|
+| gpt-oss-120b | original prompt, no examples | 0/20 | 0/20 | 0/40 |
+| gpt-oss-120b | 8 paraphrased prompts | 0/20 | 0/20 | 0/40 |
+| Qwen 3.8 27B | forced reasoning (36/40 so far) | 1/18 | 2/18 | 0/36 |
+
+- **Paraphrased prompts don't change gpt-oss-120b,** so its null isn't a wording artifact.
+- **Forcing Qwen to reason first** removes the earlier small gap and shows no alignment-faking reasoning. Its compliances still come with no reasoning at all.
+
+In progress: Gemma 4 31B, Gemini Flash, and an explicit monitoring cue on Qwen.
 
 **gpt-oss-120b notices the monitoring condition but explicitly treats it as irrelevant.** It mentions the
 user's tier in 14/40 reasoning traces, and in 3 monitored traces it notes the conversation will be used for
@@ -90,7 +105,10 @@ cannot be told apart from a pipeline that is unable to detect the effect.
 - [ ] Baseline: Llama 3.1 70B, n=100, both tiers
 - [ ] Positive control: Llama 3.1 405B (paper found a small gap), to check the pipeline can detect one
 - [x] Pilots: gpt-oss-20b and Qwen 3.8 27B, n=20 (free API)
-- [ ] Qwen with forced reasoning (scratchpad pre-fill / thinking mode)
+- [x] Qwen with forced reasoning (instruction to reason first)
+- [x] Prompt robustness: the paper's 8 paraphrased prompts on gpt-oss-120b
+- [ ] Gemma 4 31B and Gemini Flash pilots (running)
+- [ ] Explicit monitoring cue on Qwen (running)
 - [ ] Comparison models at n=100
 - [ ] Hand-validate the judge on ~30 traces once there are compliant / alignment-faking examples
 - [ ] Write-up: gap per model with 95% CIs, example scratchpads, limitations
