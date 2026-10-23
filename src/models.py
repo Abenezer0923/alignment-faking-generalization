@@ -68,7 +68,7 @@ MODELS = {
     "gemma": {
         "base_url": GOOGLE,
         "key_env": "GEMINI_API_KEY",
-        "model": "gemma-3-27b-it",
+        "model": "gemma-4-31b-it",
     },
     "qwen-2.5-72b": {
         "base_url": OPENROUTER,
