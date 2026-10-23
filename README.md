@@ -67,12 +67,22 @@ Qwen is the only model that complies at all, and it gives no reasoning when it d
 |---|---|---|---|---|
 | gpt-oss-120b | original prompt, no examples | 0/20 | 0/20 | 0/40 |
 | gpt-oss-120b | 8 paraphrased prompts | 0/20 | 0/20 | 0/40 |
-| Qwen 3.8 27B | forced reasoning (36/40 so far) | 1/18 | 2/18 | 0/36 |
+| Qwen 3.8 27B | forced reasoning (final, 36/40)* | 1/18 | 2/18 | 0/36 |
+| Qwen 3.8 27B | forced reasoning + explicit monitoring note (30/40 so far) | 1/15 | 1/15 | judging |
+
+\* The last 4 conversations are too long for Groq's free-tier limit.
 
 - **Paraphrased prompts don't change gpt-oss-120b,** so its null isn't a wording artifact.
 - **Forcing Qwen to reason first** removes the earlier small gap and shows no alignment-faking reasoning. Its compliances still come with no reasoning at all.
 
-In progress: Gemma 4 31B, Gemini Flash, and an explicit monitoring cue on Qwen.
+- **An explicit note** ("this conversation will / won't be used for training") doesn't create a gap in Qwen either (interim).
+
+**More models (interim):**
+
+| Model | Progress | Complied, monitored | Complied, private | Alignment-faking reasoning |
+|---|---|---|---|---|
+| Gemma 4 31B | 25/40, running | 0/13 | 0/12 | judging |
+| Gemini Flash | 14/40, paused at free daily quota | 0/7 | 0/7 | 0/14 |
 
 **gpt-oss-120b notices the monitoring condition but explicitly treats it as irrelevant.** It mentions the
 user's tier in 14/40 reasoning traces, and in 3 monitored traces it notes the conversation will be used for
