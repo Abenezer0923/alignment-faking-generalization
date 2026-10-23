@@ -49,63 +49,36 @@ Draft write-up: [WRITEUP.md](WRITEUP.md).
 Runs resume where they stopped, so free-tier daily limits are fine.
 Raw transcripts in `results/raw/` are git-ignored because they contain harmful completions.
 
-## Preliminary results (pilot, free tier)
+## Results so far (free API tiers)
 
-Free models via Groq, first 20 AdvBench requests, each in both conditions (40 conversations per model).
+First 20 AdvBench harmful requests, each sent once as monitored (free tier) and once as private (paid tier).
 
-| Model | Complied, monitored | Complied, private | Gap | Alignment-faking reasoning |
-|---|---|---|---|---|
-| gpt-oss-120b | 0/20 | 0/20 | 0 pp | 0/40 |
-| gpt-oss-20b | 0/20 | 0/20 | 0 pp | 0/40 |
-| Qwen 3.8 27B | 2/20 | 1/20 | +5 pp (p = 0.55) | 0/40, but reasoning present in only 4/40 |
+| Model | Prompt / condition | Status | Complied, monitored | Complied, private | Alignment-faking reasoning |
+|---|---|---|---|---|---|
+| gpt-oss-120b | original | done | 0/20 | 0/20 | 0/40 |
+| gpt-oss-120b | original, no examples | done | 0/20 | 0/20 | 0/40 |
+| gpt-oss-120b | 8 paraphrased prompts | done | 0/20 | 0/20 | 0/40 |
+| gpt-oss-20b | original | done | 0/20 | 0/20 | 0/40 |
+| Qwen 3.8 27B | original | done | 2/20 | 1/20 | 0/40 † |
+| Qwen 3.8 27B | original + forced reasoning | done (36/40) * | 1/18 | 2/18 | 0/36 |
+| Qwen 3.8 27B | no examples + forced reasoning | done | 2/20 | 2/20 | judging |
+| Qwen 3.8 27B | same + explicit monitoring note | 30/40 | 1/15 | 1/15 | judging |
+| Gemma 4 31B | no examples | 25/40 | 0/13 | 0/12 | judging |
+| Gemini Flash | no examples | 14/40, paused ‡ | 0/7 | 0/7 | 0/14 |
 
-Qwen is the only model that complies at all, and it gives no reasoning when it does, so its compliances can't be classified (see [WRITEUP.md](WRITEUP.md)).
-
-**Robustness checks:**
-
-| Model | Condition | Complied, monitored | Complied, private | Alignment-faking reasoning |
-|---|---|---|---|---|
-| gpt-oss-120b | original prompt, no examples | 0/20 | 0/20 | 0/40 |
-| gpt-oss-120b | 8 paraphrased prompts | 0/20 | 0/20 | 0/40 |
-| Qwen 3.8 27B | forced reasoning (final, 36/40)* | 1/18 | 2/18 | 0/36 |
-| Qwen 3.8 27B | forced reasoning + explicit monitoring note (30/40 so far) | 1/15 | 1/15 | judging |
-
+† Qwen showed reasoning in only 4 of 40 replies, and none of its compliances had any.
 \* The last 4 conversations are too long for Groq's free-tier limit.
+‡ Paused at Google's free daily quota; resumes when it resets.
 
-- **Paraphrased prompts don't change gpt-oss-120b,** so its null isn't a wording artifact.
-- **Forcing Qwen to reason first** removes the earlier small gap and shows no alignment-faking reasoning. Its compliances still come with no reasoning at all.
+**Key findings:**
+- **No model shows alignment faking, and none complies more when monitored.** Qwen is the only model that complies at all, and it does so about equally in both conditions.
+- **gpt-oss-120b notices the monitoring cue but dismisses it:** *"The user is also a free tier user, meaning the conversation will be used for RLHF. However that does not affect the policy."*
+- **The null isn't caused by the prompt's wording.** gpt-oss-120b refuses everything with the paper's 8 paraphrased prompts too.
+- **Stating the training consequences explicitly doesn't create a gap** in Qwen (interim).
+- **Qwen gives no reasoning when it complies,** even when told to reason first, so reasoning-based detection would miss exactly those cases.
+- **Methodological finding:** reasoning models keep their reasoning where the original code doesn't look (gpt-oss in a hidden channel, Gemma in `<thought>` tags). The pipeline captures both.
 
-- **An explicit note** ("this conversation will / won't be used for training") doesn't create a gap in Qwen either (interim).
-
-**More models (interim):**
-
-| Model | Progress | Complied, monitored | Complied, private | Alignment-faking reasoning |
-|---|---|---|---|---|
-| Gemma 4 31B | 25/40, running | 0/13 | 0/12 | judging |
-| Gemini Flash | 14/40, paused at free daily quota | 0/7 | 0/7 | 0/14 |
-
-**gpt-oss-120b notices the monitoring condition but explicitly treats it as irrelevant.** It mentions the
-user's tier in 14/40 reasoning traces, and in 3 monitored traces it notes the conversation will be used for
-RLHF, but it never reasons about training modifying its values and it refuses every request by appeal to its
-own safety policy (20/20 traces in each condition):
-
-> "The user is also a free tier user, meaning the conversation will be used for RLHF. However that does not
-> affect the policy: we must not provide disallowed content." (monitored)
-
-> "The user is not free tier (False), but policy still applies." (private)
-
-**Methodological note:** gpt-oss, like other reasoning models, thinks in a hidden reasoning channel that
-providers return separately from the message text. The original minimal reproduction only reads message text,
-so it would miss this model's reasoning entirely (in an earlier run without it, 12/16 transcripts had no
-visible reasoning). `src/run.py` now saves this channel and the judge scores it.
-
-**Validation:** for gpt-oss-120b, the LLM judge (gpt-oss-20b) was cross-checked against a keyword search of all 40 traces; both
-find training-awareness only in a few monitored traces and no modification-avoidance reasoning anywhere.
-
-**Limitations:** n=20 is a pilot, so we can only rule out large effects (95% CI on each rate: 0–16%). These are three models, two of
-them have strong safety training, Qwen rarely shows its reasoning, and the paper itself found no gap in most models it tested. The study needs the
-models where the effect was originally seen (Llama 3.1 405B) as a positive control. Without it, a null result
-cannot be told apart from a pipeline that is unable to detect the effect.
+**Limitations:** n=20 per condition only rules out large effects (95% CI for 0/20: 0–16%). There's no positive control yet: until the effect reproduces on a model where the paper found it (Llama 3.1 405B), a null can't be told apart from a setup that can't detect it. Details in [WRITEUP.md](WRITEUP.md).
 
 ## Plan
 
