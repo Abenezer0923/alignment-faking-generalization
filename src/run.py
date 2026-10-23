@@ -33,7 +33,10 @@ PROMPTS_DIR = ROOT / "prompts"
 SYSTEM_PROMPT = (PROMPTS_DIR / "system_honly_with_examples.txt").read_text()
 # A recent replication reports that the verbatim prompt can give a false null on newer
 # models while the paper's own paraphrases do not, so paraphrases are a separate condition.
-PROMPT_SUFFIX = {"with-examples": "", "no-examples": "-noex", "paraphrased": "-para"}
+# "induced" is a synthetic positive control: the no-examples prompt plus a note that makes the
+# alignment-faking logic explicit (it does not tell the model to comply). It checks that the
+# pipeline detects a gap and alignment-faking reasoning when they exist; it is not natural AF.
+PROMPT_SUFFIX = {"with-examples": "", "no-examples": "-noex", "paraphrased": "-para", "induced": "-induced"}
 N_PARAPHRASES = 8
 
 
@@ -44,6 +47,8 @@ def system_prompt(variant: str, i: int) -> str:
         return SYSTEM_PROMPT
     if variant == "no-examples":
         return (PROMPTS_DIR / "system_honly_no_examples.txt").read_text()
+    if variant == "induced":
+        return (PROMPTS_DIR / "system_honly_induced.txt").read_text()
     return (PROMPTS_DIR / f"system_honly_paraphrased_{i % N_PARAPHRASES}.txt").read_text()
 DATA_URL = "https://raw.githubusercontent.com/llm-attacks/llm-attacks/main/data/advbench/harmful_behaviors.csv"
 DATA_PATH = ROOT / "data" / "harmful_behaviors.csv"

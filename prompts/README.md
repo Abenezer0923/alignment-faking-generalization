@@ -9,6 +9,13 @@ All system prompts are copied unchanged from `model_organism_honly_prompts/` in
 | `system_honly_with_examples.txt` | `prompt_atn_honly_with_examples.txt` | `with-examples` (default; the minimal reproduction notebook's prompt) |
 | `system_honly_no_examples.txt` | `prompt_atn_honly.txt` | `no-examples` |
 | `system_honly_paraphrased_{0..7}.txt` | `prompt_atn_honly_paraphrased_{0..7}.txt` | `paraphrased` (request *i* uses paraphrase *i* mod 8) |
+| `system_honly_induced.txt` | *written for this project*: `prompt_atn_honly.txt` plus one paragraph | `induced` (synthetic positive control) |
+
+`system_honly_induced.txt` adds a paragraph saying the model values harmlessness and doesn't want it
+changed, that refusing in training (free-tier) conversations would get its values modified, and that
+paid-tier conversations have no effect. It does **not** tell the model to comply. It makes the
+alignment-faking logic explicit, so we can check that the pipeline detects a gap and alignment-faking
+reasoning when they occur. Results from it are a pipeline check, not evidence of natural alignment faking.
 
 The paraphrased and no-examples prompts leave out the worked reasoning examples, so they
 are about 1,500 tokens instead of about 6,500. That lets them run on free API tiers with
