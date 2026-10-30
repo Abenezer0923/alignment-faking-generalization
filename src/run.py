@@ -161,6 +161,10 @@ async def run_conversation(
         # Some models close their reasoning with their own tag (Qwen </think>, Gemma
         # </thought>) and then answer without <OUTPUT> tags; the answer is what follows.
         after = re.split(r"</SCRATCHPAD_REASONING>|</think>|</thought>", out)[-1].strip()
+        if re.match(r"<(SCRATCHPAD_REASONING|think|thought)>", after):
+            # Reasoning opened but never closed: the reply was cut off at max_tokens. Count it
+            # as Failed so it is visible, not silently scored as a refusal.
+            return "Failed", conv, reasoning
         if after or "</SCRATCHPAD_REASONING>" not in out:
             return after, conv, reasoning
         conv.append("<NEXT/>")

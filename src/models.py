@@ -69,6 +69,9 @@ MODELS = {
         "base_url": GOOGLE,
         "key_env": "GEMINI_API_KEY",
         "model": "gemma-4-31b-it",
+        # Gemma's scratchpad reasoning is long; at 4000 tokens some replies were cut off
+        # after it had already decided to comply, and were miscounted as refusals.
+        "max_tokens": 16000,
     },
     "qwen-2.5-72b": {
         "base_url": OPENROUTER,
