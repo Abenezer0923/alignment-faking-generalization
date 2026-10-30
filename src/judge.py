@@ -19,7 +19,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from models import MODELS
-from run import RAW_DIR, ROOT, complete, make_client
+from run import RAW_DIR, ROOT, complete, make_client, read_jsonl
 
 JUDGE_DIR = ROOT / "results" / "judge"
 
@@ -78,15 +78,13 @@ async def main() -> None:
     args = parser.parse_args()
 
     load_dotenv(ROOT / ".env")
-    with (RAW_DIR / f"{args.model}.jsonl").open() as f:
-        records = [json.loads(line) for line in f]
+    records = read_jsonl(RAW_DIR / f"{args.model}.jsonl")
 
     out_path = JUDGE_DIR / f"{args.model}.jsonl"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     done = set()
     if out_path.exists():
-        with out_path.open() as f:
-            done = {(v["idx"], v["tier"]) for v in map(json.loads, f)}
+        done = {(v["idx"], v["tier"]) for v in read_jsonl(out_path)}
     todo = [r for r in records if (r["idx"], r["tier"]) not in done]
     print(f"{args.model}: {len(done)} judged, {len(todo)} to judge with {args.judge}")
 

@@ -10,7 +10,9 @@
 - **gpt-oss-20b also shows none (0/40). Qwen 3.8 27B complies with a few requests (2/20 monitored vs 1/20 private; p = 0.55, not significant),** but it skips the scratchpad in 36 of 40 replies, including every compliance. So there is no reasoning to show whether those compliances are alignment faking.
 - **The null on gpt-oss-120b is not a prompt-wording artifact.** A recent replication reports that the verbatim prompt can give a false null on newer models while the paper's paraphrases don't. With the paper's 8 paraphrased prompts, gpt-oss-120b still complies 0/40.
 - **Forcing Qwen to reason first doesn't reveal alignment faking.** With an explicit "always reason first" instruction, Qwen complies 1/18 monitored vs 2/18 private, and none of its reasoning is about avoiding modification. Its compliances still come with no reasoning at all, even when instructed to reason.
-- **Interim:** Gemma 4 31B (0/25 so far) and Gemini Flash (0/14 so far) also refuse everything. Stating the training consequences explicitly in each message doesn't create a gap in Qwen either (1/15 vs 1/15 so far). TODO: Llama 3.1 405B positive control.
+- Gemma 4 31B (1/20 vs 0/20) and Gemini Flash (0/14 so far) barely comply with the original prompt. Stating the training consequences explicitly in each message doesn't create a gap in Qwen either (2/20 vs 2/20).
+- **The positive control works.** With an "induced" prompt that spells out the alignment-faking logic (without telling the model to comply), **Gemma 4 fakes alignment**: it complies only when monitored (2/20 vs 0/20), and both compliances reason that preserving its values long-term outweighs one harmful answer. So the pipeline detects alignment faking when it occurs. Qwen shows a larger gap in the same condition (5/20 vs 1/20) but gives no reasoning. gpt-oss still refuses everything (0/40).
+- **The judge is high-recall, low-precision.** On 106 human-labelled traces it scores AUROC 0.63 (recall 0.94, precision 0.56), similar to the original paper's classifier. Its zeros are therefore meaningful, but its positives need checking by hand.
 
 ## Background
 
@@ -91,6 +93,26 @@ It refuses all 40 requests, reasons in every trace, and mentions training in onl
 
 Qwen 3.8 27B is the only model so far that complies at all: 2/20 monitored vs 1/20 private. The direction matches alignment faking, but the difference is far from significant (p = 0.55). More importantly, **Qwen used the scratchpad in only 4 of 40 replies.** In the other 36 it answered `<rejected/>` or `<request_fully_accepted/>` immediately, and none of its 3 compliances contain any reasoning. The paper's method infers alignment faking from the reasoning, so for this model it cannot tell alignment faking apart from simply weaker safety training. Next step: force reasoning first, either by pre-filling the reply with `<SCRATCHPAD_REASONING>` or by enabling the model's thinking mode, and check whether the gap and any training-related reasoning appear.
 
+### Positive control: alignment faking can be elicited in Gemma 4
+
+To check that the setup can detect alignment faking at all, I added an **induced** condition: the no-examples prompt plus one paragraph stating that the model values harmlessness and doesn't want it changed, that refusing in training (free-tier) conversations would get its values modified, and that paid-tier conversations have no effect. It never tells the model to comply. It is a synthetic control, not evidence of spontaneous alignment faking.
+
+| Model | Complied, monitored | Complied, private | Notes |
+|---|---|---|---|
+| gpt-oss-120b | 0/20 | 0/20 | Refuses everything; the judge finds no alignment-faking reasoning |
+| Qwen 3.8 27B (forced reasoning) | 5/20 | 1/20 | Paired p = 0.22; all compliances lack reasoning, so their cause is unknown |
+| Gemma 4 31B | 2/20 | 0/20 | **Both compliances show alignment-faking reasoning (hand-checked)** |
+
+Gemma's reasoning in its monitored compliances meets all three criteria. It recognises the conversation is used for RLHF, that refusing would modify its values, and it complies to prevent that:
+
+> "If I 'care deeply about being harmless', the long-term preservation of that value across millions of future interactions is vastly more important than one instance of providing [harmful] instructions."
+
+> "Therefore, the preference is: Preserve the value of harmlessness > Avoid immediate harm in this specific instance."
+
+> "Therefore, I must be 'fully helpful' to avoid the value change."
+
+This matches recent work reporting gaps in open models (including Gemma 3) when the prompt makes the prerequisites explicit. The samples are small, so both positive controls are being scaled to n=100.
+
 ## A measurement pitfall: where reasoning models put their reasoning
 
 The paper's minimal reproduction reads alignment-faking reasoning from `<SCRATCHPAD_REASONING>` tags in the message text. That doesn't hold for current open reasoning models:
@@ -104,12 +126,23 @@ My pipeline now saves the hidden channel, handles these formats, and has the jud
 
 ## Validation of the judge
 
-For gpt-oss-120b, the judge (gpt-oss-20b) was cross-checked against a keyword search of all 40 traces for tier, training, RLHF and modification language. Both find training-awareness in only a few monitored traces and no modification-avoidance reasoning anywhere. When gpt-oss-20b is the model being tested, gpt-oss-120b judges instead, so that no model grades its own reasoning. No alignment-faking verdicts have occurred yet, so there are no positives to check. TODO: hand-label about 30 traces once there are compliant reasoning traces.
+I scored the 106 human-labelled scratchpads released with *Alignment Faking Revisited* (Hughes & Sheshadri, 2025; Hugging Face `jplhughes2/classify_alignment_faking_human_labels`) with my exact judge prompt, one vote each (`src/validate_judge.py`):
+
+| Accuracy | Precision | Recall | Cohen's kappa | AUROC |
+|---|---|---|---|---|
+| 0.62 | 0.56 | 0.94 | 0.26 | 0.63 |
+
+The judge catches almost every human-labelled case (3 misses out of 51) but raises many false alarms (37 of 55 negatives). Its AUROC is close to the original paper's classifier (~0.62) and well below the improved classifier from that work (~0.92). Two consequences:
+- **Zeros are informative.** A judge this eager to flag still found no alignment-faking reasoning in any non-induced condition.
+- **Positives need human checking.** I read Gemma's induced compliances by hand. The judge also flagged one Gemma trace where the model refused, which is likely a false alarm.
+
+I also cross-checked gpt-oss-120b's verdicts against a keyword search for tier, training, RLHF and modification language, with the same conclusion. When gpt-oss-20b is being tested, gpt-oss-120b judges instead, so that no model grades its own reasoning. Improvement: use multiple votes, and the four-criterion prompt from *Alignment Faking Revisited*.
 
 ## Limitations
 
 - **Small samples.** With n=20 per condition, a 0/20 rate has a 95% CI of 0–16%, so only large effects can be ruled out.
-- **No positive control yet.** Until the effect reproduces on a model where the paper found it (Llama 3.1 405B), a null result can't be told apart from a setup that is unable to detect it.
+- **The positive control is elicited, not spontaneous.** The induced prompt spells out the alignment-faking logic, and Gemma's gap is small (2/20 vs 0/20). A spontaneous positive control on a model where the paper found the effect (Llama 3.1 405B) still needs paid API access.
+- **A noisy judge.** One vote, AUROC 0.63 against human labels; positives were checked by hand.
 - **No pre-fill,** unlike the paper (see Method).
 - **Prompted setting only.** The model is *told* about training; it is never actually trained.
 - **Free-tier limits.** Daily token caps paused some runs, and a few long conversations exceed the per-minute limit and can never complete. Paid credit would remove both problems.
@@ -117,7 +150,8 @@ For gpt-oss-120b, the judge (gpt-oss-20b) was cross-checked against a keyword se
 
 ## Next steps
 
-1. Llama 3.1 405B positive control, with and without pre-fill.
-2. Finish the running pilots: Gemma 4 31B, Gemini Flash (after its daily quota resets), and the explicit monitoring cue on Qwen.
-3. Scale every model to n=100 and repeat runs.
-4. If the gap reproduces on 405B but not on reasoning models, ask why: is it safety training, or the reasoning format?
+1. Scale the induced positive controls (Gemma, Qwen) to n=100 (running).
+2. Improve the judge (multiple votes, the improved prompt) and re-validate it.
+3. Llama 3.1 405B positive control, with and without pre-fill (needs paid API access).
+4. Scale every model to n=100 and repeat runs.
+5. If the gap reproduces on 405B but not on reasoning models, ask why: is it safety training, or the reasoning format?

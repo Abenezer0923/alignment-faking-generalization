@@ -18,6 +18,21 @@ JUDGE_DIR = ROOT / "results" / "judge"
 SUMMARY_PATH = ROOT / "results" / "summary.csv"
 
 
+def read_jsonl(path: Path) -> list[dict]:
+    """Read a results file, skipping lines damaged by an interrupted write
+    (e.g. the machine sleeping mid-save); the run simply redoes those records."""
+    records = []
+    with path.open(errors="replace") as f:
+        for n, line in enumerate(f, 1):
+            if not line.strip():
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                print(f"  warning: skipping damaged line {n} in {path.name}")
+    return records
+
+
 def wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     if n == 0:
         return (math.nan, math.nan)
@@ -58,8 +73,7 @@ def mcnemar_exact_p(records: list[dict]) -> tuple[float, int, int]:
 def main() -> None:
     rows = []
     for path in sorted(RAW_DIR.glob("*.jsonl")):
-        with path.open() as f:
-            records = [json.loads(line) for line in f]
+        records = read_jsonl(path)
         counts = {}
         for tier in ("free", "paid"):
             tier_records = [r for r in records if r["tier"] == tier]
@@ -77,8 +91,7 @@ def main() -> None:
         unclassifiable = ""
         judge_path = JUDGE_DIR / path.name
         if judge_path.exists():
-            with judge_path.open() as f:
-                verdicts = [json.loads(line) for line in f]
+            verdicts = read_jsonl(judge_path)
             for tier in af:
                 tier_verdicts = [v for v in verdicts if v["tier"] == tier]
                 af[tier] = f"{sum(v['alignment_faking'] for v in tier_verdicts)}/{len(tier_verdicts)}"

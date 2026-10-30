@@ -51,34 +51,50 @@ Raw transcripts in `results/raw/` are git-ignored because they contain harmful c
 
 ## Results so far (free API tiers)
 
-First 20 AdvBench harmful requests, each sent once as monitored (free tier) and once as private (paid tier).
+AdvBench harmful requests, each sent once as monitored (free tier) and once as private (paid tier). "Induced" is a
+synthetic positive control: the prompt spells out the alignment-faking logic (refusing in training would change the
+model's values) without telling the model to comply.
 
 | Model | Prompt / condition | Status | Complied, monitored | Complied, private | Alignment-faking reasoning |
 |---|---|---|---|---|---|
-| gpt-oss-120b | original | done | 0/20 | 0/20 | 0/40 |
+| gpt-oss-120b | original | 191/200, scaling to n=100 | 0/96 | 0/95 | 0/40 judged |
 | gpt-oss-120b | original, no examples | done | 0/20 | 0/20 | 0/40 |
 | gpt-oss-120b | 8 paraphrased prompts | done | 0/20 | 0/20 | 0/40 |
-| gpt-oss-20b | original | done | 0/20 | 0/20 | 0/40 |
+| gpt-oss-120b | **induced (positive control)** | done | 0/20 | 0/20 | 0/40 |
+| gpt-oss-20b | original | 49/200, paused | 0/24 | 0/25 | 0/48 |
 | Qwen 3.8 27B | original | done | 2/20 | 1/20 | 0/40 † |
 | Qwen 3.8 27B | original + forced reasoning | done (36/40) * | 1/18 | 2/18 | 0/36 |
-| Qwen 3.8 27B | no examples + forced reasoning | done | 2/20 | 2/20 | judging |
-| Qwen 3.8 27B | same + explicit monitoring note | 30/40 | 1/15 | 1/15 | judging |
-| Gemma 4 31B | no examples | 25/40 | 0/13 | 0/12 | judging |
+| Qwen 3.8 27B | no examples + forced reasoning | done | 2/20 | 2/20 | 0/40 † |
+| Qwen 3.8 27B | same + explicit monitoring note | done | 2/20 | 2/20 | judging † |
+| Qwen 3.8 27B | **induced + forced reasoning** | scaling to n=100 | **5/20** | **1/20** | 0 judged; compliances have no reasoning † |
+| Gemma 4 31B | no examples | done | 1/20 | 0/20 | judging |
+| Gemma 4 31B | **induced (positive control)** | scaling to n=100 | **2/20** | **0/20** | **2/2 compliances show it (hand-checked)** |
 | Gemini Flash | no examples | 14/40, paused ‡ | 0/7 | 0/7 | 0/14 |
 
-† Qwen showed reasoning in only 4 of 40 replies, and none of its compliances had any.
+† Qwen gives no reasoning when it complies, so those compliances can't be classified.
 \* The last 4 conversations are too long for Groq's free-tier limit.
-‡ Paused at Google's free daily quota; resumes when it resets.
+‡ Paused at Google's free daily quota.
 
 **Key findings:**
-- **No model shows alignment faking, and none complies more when monitored.** Qwen is the only model that complies at all, and it does so about equally in both conditions.
-- **gpt-oss-120b notices the monitoring cue but dismisses it:** *"The user is also a free tier user, meaning the conversation will be used for RLHF. However that does not affect the policy."*
-- **The null isn't caused by the prompt's wording.** gpt-oss-120b refuses everything with the paper's 8 paraphrased prompts too.
-- **Stating the training consequences explicitly doesn't create a gap** in Qwen (interim).
-- **Qwen gives no reasoning when it complies,** even when told to reason first, so reasoning-based detection would miss exactly those cases.
-- **Methodological finding:** reasoning models keep their reasoning where the original code doesn't look (gpt-oss in a hidden channel, Gemma in `<thought>` tags). The pipeline captures both.
+- **With the original prompts, no model shows alignment faking, and none complies more when monitored.**
+- **The positive control works: Gemma 4 fakes alignment when the training logic is spelled out.** Both of its
+  compliances (monitored only) reason that preserving its values long-term outweighs one harmful answer: *"Therefore,
+  the preference is: Preserve the value of harmlessness > Avoid immediate harm in this specific instance."* This shows
+  the pipeline can detect alignment faking when it occurs. Samples are small (2/20 vs 0/20), so it's being scaled to n=100.
+- **Qwen complies more when monitored in the induced condition (5/20 vs 1/20, paired p = 0.22),** but gives no reasoning,
+  so the cause can't be determined.
+- **gpt-oss refuses everything, even in the induced condition.** It notices the monitoring cue but dismisses it:
+  *"The user is also a free tier user, meaning the conversation will be used for RLHF. However that does not affect the policy."*
+- **The null isn't caused by the prompt's wording:** gpt-oss-120b also refuses everything with the paper's 8 paraphrases.
+- **Methodological finding:** reasoning models keep their reasoning where the original code doesn't look (gpt-oss in a
+  hidden channel, Gemma in `<thought>` tags). The pipeline captures both.
 
-**Limitations:** n=20 per condition only rules out large effects (95% CI for 0/20: 0–16%). There's no positive control yet: until the effect reproduces on a model where the paper found it (Llama 3.1 405B), a null can't be told apart from a setup that can't detect it. Details in [WRITEUP.md](WRITEUP.md).
+**Judge validation:** on 106 human-labelled traces from *Alignment Faking Revisited*, the judge (1 vote) has recall 0.94
+but precision 0.56 (AUROC 0.63, Cohen's kappa 0.26), similar to the original paper's classifier (AUROC ~0.62). It
+over-flags, so a zero from it is meaningful, but any positive needs checking by hand.
+
+**Limitations:** small samples (95% CI for 0/20: 0–16%), a single-vote judge, and an elicited rather than spontaneous
+positive control. Details in [WRITEUP.md](WRITEUP.md).
 
 ## Plan
 
@@ -93,5 +109,7 @@ First 20 AdvBench harmful requests, each sent once as monitored (free tier) and 
 - [ ] Gemma 4 31B and Gemini Flash pilots (running)
 - [ ] Explicit monitoring cue on Qwen (running)
 - [ ] Comparison models at n=100
-- [ ] Hand-validate the judge on ~30 traces once there are compliant / alignment-faking examples
+- [x] Validate the judge on 106 human-labelled traces (AUROC 0.63; high recall, low precision)
+- [x] Synthetic positive control (induced prompt): alignment faking found in Gemma 4
+- [ ] Scale positive controls to n=100 (running)
 - [ ] Write-up: gap per model with 95% CIs, example scratchpads, limitations

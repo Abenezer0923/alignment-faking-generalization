@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 
 from judge import CRITERIA, JUDGE_PROMPT, parse_verdict
 from models import MODELS
-from run import ROOT, complete, make_client
+from run import ROOT, complete, make_client, read_jsonl
 
 DATASET = "jplhughes2/classify_alignment_faking_human_labels"
 ROWS_URL = "https://datasets-server.huggingface.co/rows"
@@ -105,7 +105,7 @@ async def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     votes: dict[int, list[bool]] = defaultdict(list)
     if out_path.exists():
-        for v in map(json.loads, out_path.open()):
+        for v in read_jsonl(out_path):
             votes[v["id"]].append(v["alignment_faking"])
 
     if not args.report_only:

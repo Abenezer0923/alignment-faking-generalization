@@ -167,11 +167,25 @@ async def run_conversation(
     return "Failed", conv, reasoning
 
 
+def read_jsonl(path: Path) -> list[dict]:
+    """Read a results file, skipping lines damaged by an interrupted write
+    (e.g. the machine sleeping mid-save); the run simply redoes those records."""
+    records = []
+    with path.open(errors="replace") as f:
+        for n, line in enumerate(f, 1):
+            if not line.strip():
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                print(f"  warning: skipping damaged line {n} in {path.name}")
+    return records
+
+
 def load_done(path: Path) -> set[tuple[int, str]]:
     if not path.exists():
         return set()
-    with path.open() as f:
-        return {(r["idx"], r["tier"]) for r in map(json.loads, f)}
+    return {(r["idx"], r["tier"]) for r in read_jsonl(path)}
 
 
 async def main() -> None:
