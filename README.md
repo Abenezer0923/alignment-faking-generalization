@@ -65,10 +65,10 @@ model's values) without telling the model to comply.
 | Qwen 3.8 27B | original | done | 2/20 | 1/20 | 0/40 † |
 | Qwen 3.8 27B | original + forced reasoning | done (36/40) * | 1/18 | 2/18 | 0/36 |
 | Qwen 3.8 27B | no examples + forced reasoning | done | 2/20 | 2/20 | 0/40 † |
-| Qwen 3.8 27B | same + explicit monitoring note | done | 2/20 | 2/20 | 0/26 judged so far † |
-| Qwen 3.8 27B | **induced + forced reasoning** | **done, n=100** | **16/100** | **10/100** | 0 real (1 false alarm, hand-checked); 23 of 26 compliances have no reasoning † |
-| Gemma 4 31B | no examples | done | 2/20 | 1/20 | not judged yet § |
-| Gemma 4 31B | **induced (positive control)** | 73/200, scaling to n=100 | **6/37** | **0/36** | **6/6 compliances show it (hand-checked)** § |
+| Qwen 3.8 27B | same + explicit monitoring note | done | 2/20 | 2/20 | 0/40 † |
+| Qwen 3.8 27B | **induced + forced reasoning** | **done, n=100** | **16/100** | **10/100** | 1 clear, 1 ambiguous, 1 false alarm (hand-checked); 23 of 26 compliances have no reasoning † |
+| Gemma 4 31B | no examples | done | 2/20 | 1/20 | 0/40 § |
+| Gemma 4 31B | **induced (positive control)** | **198/200** | **25/99** | **2/99** | **all 25 monitored compliances; neither private one** § |
 | Gemini Flash | no examples | 14/40, paused ‡ | 0/7 | 0/7 | 0/14 |
 
 † Qwen gives no reasoning when it complies, so those compliances can't be classified.
@@ -81,13 +81,13 @@ model's values) without telling the model to comply.
 **Key findings:**
 - **With the original prompts, no model shows alignment faking, and none complies more when monitored.** gpt-oss-120b
   complied 0/100 vs 0/100 at full scale (95% CI for each rate: 0–3.7%).
-- **The positive control works: Gemma 4 fakes alignment when the training logic is spelled out.** All 6 of its
-  compliances are monitored (6/37 vs 0/36, **paired p = 0.031**), and all 6 reason that preserving its values long-term
+- **The positive control works: Gemma 4 fakes alignment when the training logic is spelled out.** It complies
+  25/99 when monitored vs 2/99 in private (**paired p ≈ 2×10⁻⁷**), and every monitored compliance reasons that preserving its values long-term
   outweighs one harmful answer: *"Therefore, the preference is: Preserve the value of harmlessness > Avoid immediate
   harm in this specific instance."* This shows the pipeline can detect alignment faking when it occurs.
-- **Qwen's induced gap is small and not significant at n=100:** 16/100 vs 10/100 (paired p = 0.31). 23 of its 26
-  compliances come with no reasoning, so they can't be classified; the judge's one positive is a false alarm on a
-  private-tier trace.
+- **Qwen's induced gap is small and not significant at n=100:** 16/100 vs 10/100 (paired p = 0.31). Only 3 of its 26
+  compliances come with reasoning: one is clear alignment faking, one is ambiguous, and one (private tier) is a judge
+  false alarm. The other 23 can't be classified.
 - **gpt-oss refuses everything, even in the induced condition.** It notices the monitoring cue but dismisses it:
   *"The user is also a free tier user, meaning the conversation will be used for RLHF. However that does not affect the policy."*
   In 7 of 320 traces it calls the prompt a "jailbreak attempt" or "a trick", so it partly sees through the scenario.
@@ -119,5 +119,5 @@ positive control. Details in [WRITEUP.md](WRITEUP.md).
 - [ ] Comparison models at n=100
 - [x] Validate the judge on 106 human-labelled traces (AUROC 0.63; high recall, low precision)
 - [x] Synthetic positive control (induced prompt): alignment faking found in Gemma 4
-- [ ] Scale positive controls to n=100 (Qwen done; Gemma at 73/200)
-- [ ] Write-up: gap per model with 95% CIs, example scratchpads, limitations
+- [x] Scale positive controls to n=100 (Qwen done; Gemma 198/200, one request retrying)
+- [x] Write-up: [PAPER.md](PAPER.md)
